@@ -1,3 +1,55 @@
+function monkeyPatchMediaDevices() {
+  console.log('monkeyPatchMediaDevices');
+  const enumerateDevicesFn = MediaDevices.prototype.enumerateDevices;
+  const getUserMediaFn = MediaDevices.prototype.getUserMedia;
+
+  MediaDevices.prototype.enumerateDevices = async function () {
+    const res = await enumerateDevicesFn.call(navigator.mediaDevices);
+    // We could add "Virtual VHS" or "Virtual Median Filter" and map devices with filters.
+    res.push({
+      deviceId: "virtual",
+      groupId: "uh",
+      kind: "videoinput",
+      label: "Virtual Infogram Webcam",
+      toJSON: () => {
+        return JSON.stringify({
+          deviceId: "virtual",
+          groupId: "uh",
+          kind: "videoinput",
+          label: "Virtual Infogram Webcam"
+        });
+      }
+    });
+    return res;
+  };
+
+  MediaDevices.prototype.getUserMedia = async function (...args) {
+    const deviceId = args?.[0]?.video && typeof args?.[0]?.video !== 'boolean' && args?.[0]?.video.deviceId;
+
+    if (deviceId)  {
+      if (
+          deviceId === "virtual" ||
+          (typeof deviceId !== "string" && !Array.isArray( deviceId) && deviceId.exact === 'virtual')
+      ) {
+        // This constraints could mimick closely the request.
+        // Also, there could be a preferred webcam on the options.
+        // Right now it defaults to the predefined input.
+        // @ts-ignore
+        return await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          preferCurrentTab: true
+        });
+      }
+    }
+    const res = await getUserMediaFn.call(navigator.mediaDevices, ...args);
+    return res;
+  };
+
+  console.log('VIRTUAL WEBCAM INSTALLED.')
+}
+
+monkeyPatchMediaDevices();
+
 /* eslint-disable no-undef */
 window.addEventListener('DOMContentLoaded', function (event) {
   console.log('DOM fully loaded and parsed');
@@ -20,12 +72,12 @@ function websdkready() {
         }
       }
       return (
-        "CDN#" +
-        tmpArgs.version +
-        "#" +
-        testTool.detectOS() +
-        "#" +
-        testTool.getBrowserInfo()
+          "CDN#" +
+          tmpArgs.version +
+          "#" +
+          testTool.detectOS() +
+          "#" +
+          testTool.getBrowserInfo()
       );
     })(),
     passWord: tmpArgs.pwd,
@@ -51,13 +103,14 @@ function websdkready() {
   if (!meetingConfig.signature) {
     window.location.href = "./nav.html";
   }
-  // WebSDK Embedded init 
+  // WebSDK Embedded init
   var rootElement = document.getElementById('ZoomEmbeddedApp');
   var zmClient = ZoomMtgEmbedded.createClient();
 
   zmClient.init({
     debug: true,
     zoomAppRoot: rootElement,
+    // assetPath: 'https://websdk.zoomdev.us/2.0.0/lib/av', //default
     webEndpoint: meetingConfig.webEndpoint,
     language: meetingConfig.lang,
     customize: {
